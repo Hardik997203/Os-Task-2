@@ -1,18 +1,15 @@
 Operating Systems Programming Assignment
 AI-Assisted Synchronization and Visualization
-
-(1) Student Information
+1. Student Information
 •	Student Name: Hardik Shetty
 •	USN: NNM24IS090
-
-(2) Project Description
+2. Project Description
 This project demonstrates thread synchronization in Operating Systems through the Readers-Writers Problem and the Dining Philosophers Problem. Python threads and synchronization mechanisms are used to coordinate access to shared resources.
 The submitted programs also record execution events and generate HTML visualizations to help understand the sequence of states during execution.
 1.	Readers-Writers Problem using Semaphores.
 2.	Dining Philosophers Problem using Monitor-Style Synchronization.
 3. Programming Language and Libraries
- 
-(3)Programming language: Python 3
+Programming language: Python 3
 Libraries used:
 •	threading — creates threads and provides synchronization mechanisms.
 •	time — introduces delays and records elapsed time.
@@ -27,7 +24,7 @@ Visualization technologies:
 •	JavaScript for event playback and interactive visualization.
 •	A modern web browser for viewing the generated HTML files.
 All imported Python modules are part of the Python standard library. No additional Python packages are required.
-5.  Build and Compilation Instructions
+4.  Build and Compilation Instructions
 Tools required:
 •	Python 3
 •	Visual Studio Code (VS Code)
@@ -182,7 +179,6 @@ https://chatgpt.com/s/p_6acfab63bfbc8191ac9166d4869d8c3d
 2.	Python Software Foundation. threading — Thread-based Parallelism. https://docs.python.org/3/library/threading.html
 3.	Python Software Foundation. json — JSON Encoder and Decoder. https://docs.python.org/3/library/json.html
 4.	Operating Systems Programming Assignment instructions provided for this project.
-	
 14. Acknowledgements
 I acknowledge the use of ChatGPT, Kimi, and Gemini as AI assistance tools during the development and documentation of this project.
 The purpose of the project is to demonstrate synchronization concepts, thread coordination, shared-resource access, event recording, and visualization of execution states.
