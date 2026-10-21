@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dining Philosophers - Monitor and FIFO</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px auto;
+    padding: 0 16px;
+    max-width: 1050px;
+    background: #f3f6fa;
+    color: #172033;
+}
+h1, h2 { text-align: center; }
+.subtitle { text-align: center; color: #526078; }
+.panel {
+    background: white;
+    border-radius: 12px;
+    padding: 18px;
+    margin: 16px 0;
+    box-shadow: 0 2px 8px #00000012;
+}
+.seats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+.philosopher {
+    padding: 14px;
+    border-radius: 9px;
+    border: 2px solid #dce3ed;
+}
+.state {
+    font-weight: bold;
+    margin-top: 8px;
+}
+.forks {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+.fork {
+    background: #e8eef7;
+    border-radius: 8px;
+    padding: 12px 5px;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+.free { background: #d9f7e8; }
+.busy { background: #ffe6bd; }
+.controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+button {
+    padding: 9px 14px;
+    border: 0;
+    border-radius: 7px;
+    cursor: pointer;
+    background: #2458a6;
+    color: white;
+}
+input[type=range] { flex: 1; min-width: 150px; }
+#log {
+    max-height: 320px;
+    overflow-y: auto;
+}
+.log-row {
+    padding: 8px;
+    border-bottom: 1px solid #e5eaf1;
+    font-size: 14px;
+}
+.active {
+    background: #e1edff;
+    font-weight: bold;
+}
+.note { color: #526078; font-size: 14px; }
+@media(max-width: 600px) {
+    .seats { grid-template-columns: 1fr; }
+    .forks { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+<h1>Dining Philosophers Problem</h1>
+<p class="subtitle">Monitor + Condition Variable + FIFO Queue</p>
+
+<div class="panel">
+    <h2>Execution Replay</h2>
+    <div class="controls">
+        <button onclick="previousEvent()">Previous</button>
+        <button id="play" onclick="togglePlay()">Play</button>
+        <button onclick="nextEvent()">Next</button>
+        <button onclick="resetReplay()">Reset</button>
+    </div>
+    <p id="progress"></p>
+    <input id="timeline" type="range" min="0" value="0"
+           step="1" oninput="showEvent(Number(this.value))">
+    <p id="message"></p>
+    <p class="note">This replay uses the execution events recorded by the
+    Python synchronization program, not a separate simulated schedule.</p>
+</div>
+
+<div class="panel">
+    <h2>Philosopher States</h2>
+    <div id="philosophers" class="seats"></div>
+</div>
+
+<div class="panel">
+    <h2>Four Forks</h2>
+    <div id="forks" class="forks"></div>
+</div>
+
+<div class="panel">
+    <h2>FIFO Waiting Queue</h2>
+    <p id="queue"></p>
+</div>
+
+<div class="panel">
+    <h2>Execution Log</h2>
+    <div id="log"></div>
+</div>
+
+<script>
+const events = [{"number": 1, "message": "Simulation started", "states": ["Thinking", "Thinking", "Thinking", "Thinking"], "forks": [null, null, null, null], "queue": [], "time": 0.0}, {"number": 2, "message": "P0 is thinking", "states": ["Thinking", "Thinking", "Thinking", "Thinking"], "forks": [null, null, null, null], "queue": [], "time": 0.0}, {"number": 3, "message": "P1 is thinking", "states": ["Thinking", "Thinking", "Thinking", "Thinking"], "forks": [null, null, null, null], "queue": [], "time": 0.0}, {"number": 4, "message": "P2 is thinking", "states": ["Thinking", "Thinking", "Thinking", "Thinking"], "forks": [null, null, null, null], "queue": [], "time": 0.0}, {"number": 5, "message": "P3 is thinking", "states": ["Thinking", "Thinking", "Thinking", "Thinking"], "forks": [null, null, null, null], "queue": [], "time": 0.0}, {"number": 6, "message": "P2 joined the FIFO queue", "states": ["Thinking", "Thinking", "Hungry/Waiting", "Thinking"], "forks": [null, null, null, null], "queue": [2], "time": 0.25}, {"number": 7, "message": "P2 is acquiring both forks", "states": ["Thinking", "Thinking", "Acquiring Forks", "Thinking"], "forks": [null, null, null, null], "queue": [2], "time": 0.25}, {"number": 8, "message": "P2 acquired F2 and F3", "states": ["Thinking", "Thinking", "Acquiring Forks", "Thinking"], "forks": [null, null, 2, 2], "queue": [], "time": 0.25}, {"number": 9, "message": "P2 started eating meal 1", "states": ["Thinking", "Thinking", "Eating", "Thinking"], "forks": [null, null, 2, 2], "queue": [], "time": 0.25}, {"number": 10, "message": "P3 joined the FIFO queue", "states": ["Thinking", "Thinking", "Eating", "Hungry/Waiting"], "forks": [null, null, 2, 2], "queue": [3], "time": 0.29}, {"number": 11, "message": "P1 joined the FIFO queue", "states": ["Thinking", "Hungry/Waiting", "Eating", "Hungry/Waiting"], "forks": [null, null, 2, 2], "queue": [3, 1], "time": 0.33}, {"number": 12, "message": "P0 joined the FIFO queue", "states": ["Hungry/Waiting", "Hungry/Waiting", "Eating", "Hungry/Waiting"], "forks": [null, null, 2, 2], "queue": [3, 1, 0], "time": 0.42}, {"number": 13, "message": "P2 is releasing forks", "states": ["Hungry/Waiting", "Hungry/Waiting", "Releasing Forks", "Hungry/Waiting"], "forks": [null, null, 2, 2], "queue": [3, 1, 0], "time": 0.76}, {"number": 14, "message": "P2 released both forks", "states": ["Hungry/Waiting", "Hungry/Waiting", "Releasing Forks", "Hungry/Waiting"], "forks": [null, null, null, null], "queue": [3, 1, 0], "time": 0.76}, {"number": 15, "message": "P2 is thinking", "states": ["Hungry/Waiting", "Hungry/Waiting", "Thinking", "Hungry/Waiting"], "forks": [null, null, null, null], "queue": [3, 1, 0], "time": 0.76}, {"number": 16, "message": "P3 is acquiring both forks", "states": ["Hungry/Waiting", "Hungry/Waiting", "Thinking", "Acquiring Forks"], "forks": [null, null, null, null], "queue": [3, 1, 0], "time": 0.76}, {"number": 17, "message": "P3 acquired F3 and F0", "states": ["Hungry/Waiting", "Hungry/Waiting", "Thinking", "Acquiring Forks"], "forks": [3, null, null, 3], "queue": [1, 0], "time": 0.76}, {"number": 18, "message": "P3 started eating meal 1", "states": ["Hungry/Waiting", "Hungry/Waiting", "Thinking", "Eating"], "forks": [3, null, null, 3], "queue": [1, 0], "time": 0.76}, {"number": 19, "message": "P2 joined the FIFO queue", "states": ["Hungry/Waiting", "Hungry/Waiting", "Hungry/Waiting", "Eating"], "forks": [3, null, null, 3], "queue": [1, 0, 2], "time": 1.0}, {"number": 20, "message": "P1 is acquiring both forks", "states": ["Hungry/Waiting", "Acquiring Forks", "Hungry/Waiting", "Eating"], "forks": [3, null, null, 3], "queue": [1, 0, 2], "time": 1.0}, {"number": 21, "message": "P1 acquired F1 and F2", "states": ["Hungry/Waiting", "Acquiring Forks", "Hungry/Waiting", "Eating"], "forks": [3, 1, 1, 3], "queue": [0, 2], "time": 1.0}, {"number": 22, "message": "P1 started eating meal 1", "states": ["Hungry/Waiting", "Eating", "Hungry/Waiting", "Eating"], "forks": [3, 1, 1, 3], "queue": [0, 2], "time": 1.0}, {"number": 23, "message": "P3 is releasing forks", "states": ["Hungry/Waiting", "Eating", "Hungry/Waiting", "Releasing Forks"], "forks": [3, 1, 1, 3], "queue": [0, 2], "time": 1.11}, {"number": 24, "message": "P3 released both forks", "states": ["Hungry/Waiting", "Eating", "Hungry/Waiting", "Releasing Forks"], "forks": [null, 1, 1, null], "queue": [0, 2], "time": 1.11}, {"number": 25, "message": "P3 is thinking", "states": ["Hungry/Waiting", "Eating", "Hungry/Waiting", "Thinking"], "forks": [null, 1, 1, null], "queue": [0, 2], "time": 1.11}, {"number": 26, "message": "P3 joined the FIFO queue", "states": ["Hungry/Waiting", "Eating", "Hungry/Waiting", "Hungry/Waiting"], "forks": [null, 1, 1, null], "queue": [0, 2, 3], "time": 1.42}, {"number": 27, "message": "P1 is releasing forks", "states": ["Hungry/Waiting", "Releasing Forks", "Hungry/Waiting", "Hungry/Waiting"], "forks": [null, 1, 1, null], "queue": [0, 2, 3], "time": 1.47}, {"number": 28, "message": "P1 released both forks", "states": ["Hungry/Waiting", "Releasing Forks", "Hungry/Waiting", "Hungry/Waiting"], "forks": [null, null, null, null], "queue": [0, 2, 3], "time": 1.47}, {"number": 29, "message": "P1 is thinking", "states": ["Hungry/Waiting", "Thinking", "Hungry/Waiting", "Hungry/Waiting"], "forks": [null, null, null, null], "queue": [0, 2, 3], "time": 1.47}, {"number": 30, "message": "P0 is acquiring both forks", "states": ["Acquiring Forks", "Thinking", "Hungry/Waiting", "Hungry/Waiting"], "forks": [null, null, null, null], "queue": [0, 2, 3], "time": 1.47}, {"number": 31, "message": "P0 acquired F0 and F1", "states": ["Acquiring Forks", "Thinking", "Hungry/Waiting", "Hungry/Waiting"], "forks": [0, 0, null, null], "queue": [2, 3], "time": 1.47}, {"number": 32, "message": "P0 started eating meal 1", "states": ["Eating", "Thinking", "Hungry/Waiting", "Hungry/Waiting"], "forks": [0, 0, null, null], "queue": [2, 3], "time": 1.47}, {"number": 33, "message": "P1 joined the FIFO queue", "states": ["Eating", "Hungry/Waiting", "Hungry/Waiting", "Hungry/Waiting"], "forks": [0, 0, null, null], "queue": [2, 3, 1], "time": 1.96}, {"number": 34, "message": "P2 is acquiring both forks", "states": ["Eating", "Hungry/Waiting", "Acquiring Forks", "Hungry/Waiting"], "forks": [0, 0, null, null], "queue": [2, 3, 1], "time": 1.96}, {"number": 35, "message": "P2 acquired F2 and F3", "states": ["Eating", "Hungry/Waiting", "Acquiring Forks", "Hungry/Waiting"], "forks": [0, 0, 2, 2], "queue": [3, 1], "time": 1.96}, {"number": 36, "message": "P2 started eating meal 2", "states": ["Eating", "Hungry/Waiting", "Eating", "Hungry/Waiting"], "forks": [0, 0, 2, 2], "queue": [3, 1], "time": 1.96}, {"number": 37, "message": "P0 is releasing forks", "states": ["Releasing Forks", "Hungry/Waiting", "Eating", "Hungry/Waiting"], "forks": [0, 0, 2, 2], "queue": [3, 1], "time": 2.0}, {"number": 38, "message": "P0 released both forks", "states": ["Releasing Forks", "Hungry/Waiting", "Eating", "Hungry/Waiting"], "forks": [null, null, 2, 2], "queue": [3, 1], "time": 2.0}, {"number": 39, "message": "P0 is thinking", "states": ["Thinking", "Hungry/Waiting", "Eating", "Hungry/Waiting"], "forks": [null, null, 2, 2], "queue": [3, 1], "time": 2.0}, {"number": 40, "message": "P0 joined the FIFO queue", "states": ["Hungry/Waiting", "Hungry/Waiting", "Eating", "Hungry/Waiting"], "forks": [null, null, 2, 2], "queue": [3, 1, 0], "time": 2.26}, {"number": 41, "message": "P2 is releasing forks", "states": ["Hungry/Waiting", "Hungry/Waiting", "Releasing Forks", "Hungry/Waiting"], "forks": [null, null, 2, 2], "queue": [3, 1, 0], "time": 2.28}, {"number": 42, "message": "P2 released both forks", "states": ["Hungry/Waiting", "Hungry/Waiting", "Releasing Forks", "Hungry/Waiting"], "forks": [null, null, null, null], "queue": [3, 1, 0], "time": 2.28}, {"number": 43, "message": "P2 is thinking", "states": ["Hungry/Waiting", "Hungry/Waiting", "Thinking", "Hungry/Waiting"], "forks": [null, null, null, null], "queue": [3, 1, 0], "time": 2.28}, {"number": 44, "message": "P3 is acquiring both forks", "states": ["Hungry/Waiting", "Hungry/Waiting", "Thinking", "Acquiring Forks"], "forks": [null, null, null, null], "queue": [3, 1, 0], "time": 2.28}, {"number": 45, "message": "P3 acquired F3 and F0", "states": ["Hungry/Waiting", "Hungry/Waiting", "Thinking", "Acquiring Forks"], "forks": [3, null, null, 3], "queue": [1, 0], "time": 2.28}, {"number": 46, "message": "P3 started eating meal 2", "states": ["Hungry/Waiting", "Hungry/Waiting", "Thinking", "Eating"], "forks": [3, null, null, 3], "queue": [1, 0], "time": 2.28}, {"number": 47, "message": "P1 is acquiring both forks", "states": ["Hungry/Waiting", "Acquiring Forks", "Thinking", "Eating"], "forks": [3, null, null, 3], "queue": [1, 0], "time": 2.28}, {"number": 48, "message": "P1 acquired F1 and F2", "states": ["Hungry/Waiting", "Acquiring Forks", "Thinking", "Eating"], "forks": [3, 1, 1, 3], "queue": [0], "time": 2.28}, {"number": 49, "message": "P1 started eating meal 2", "states": ["Hungry/Waiting", "Eating", "Thinking", "Eating"], "forks": [3, 1, 1, 3], "queue": [0], "time": 2.28}, {"number": 50, "message": "P2 joined the FIFO queue", "states": ["Hungry/Waiting", "Eating", "Hungry/Waiting", "Eating"], "forks": [3, 1, 1, 3], "queue": [0, 2], "time": 2.54}, {"number": 51, "message": "P3 is releasing forks", "states": ["Hungry/Waiting", "Eating", "Hungry/Waiting", "Releasing Forks"], "forks": [3, 1, 1, 3], "queue": [0, 2], "time": 2.66}, {"number": 52, "message": "P3 released both forks", "states": ["Hungry/Waiting", "Eating", "Hungry/Waiting", "Releasing Forks"], "forks": [null, 1, 1, null], "queue": [0, 2], "time": 2.66}, {"number": 53, "message": "P3 is thinking", "states": ["Hungry/Waiting", "Eating", "Hungry/Waiting", "Thinking"], "forks": [null, 1, 1, null], "queue": [0, 2], "time": 2.66}, {"number": 54, "message": "P1 is releasing forks", "states": ["Hungry/Waiting", "Releasing Forks", "Hungry/Waiting", "Thinking"], "forks": [null, 1, 1, null], "queue": [0, 2], "time": 2.69}, {"number": 55, "message": "P1 released both forks", "states": ["Hungry/Waiting", "Releasing Forks", "Hungry/Waiting", "Thinking"], "forks": [null, null, null, null], "queue": [0, 2], "time": 2.69}, {"number": 56, "message": "P1 is thinking", "states": ["Hungry/Waiting", "Thinking", "Hungry/Waiting", "Thinking"], "forks": [null, null, null, null], "queue": [0, 2], "time": 2.69}, {"number": 57, "message": "P0 is acquiring both forks", "states": ["Acquiring Forks", "Thinking", "Hungry/Waiting", "Thinking"], "forks": [null, null, null, null], "queue": [0, 2], "time": 2.69}, {"number": 58, "message": "P0 acquired F0 and F1", "states": ["Acquiring Forks", "Thinking", "Hungry/Waiting", "Thinking"], "forks": [0, 0, null, null], "queue": [2], "time": 2.69}, {"number": 59, "message": "P0 started eating meal 2", "states": ["Eating", "Thinking", "Hungry/Waiting", "Thinking"], "forks": [0, 0, null, null], "queue": [2], "time": 2.69}, {"number": 60, "message": "P1 joined the FIFO queue", "states": ["Eating", "Hungry/Waiting", "Hungry/Waiting", "Thinking"], "forks": [0, 0, null, null], "queue": [2, 1], "time": 2.91}, {"number": 61, "message": "P2 is acquiring both forks", "states": ["Eating", "Hungry/Waiting", "Acquiring Forks", "Thinking"], "forks": [0, 0, null, null], "queue": [2, 1], "time": 2.91}, {"number": 62, "message": "P2 acquired F2 and F3", "states": ["Eating", "Hungry/Waiting", "Acquiring Forks", "Thinking"], "forks": [0, 0, 2, 2], "queue": [1], "time": 2.91}, {"number": 63, "message": "P2 started eating meal 3", "states": ["Eating", "Hungry/Waiting", "Eating", "Thinking"], "forks": [0, 0, 2, 2], "queue": [1], "time": 2.91}, {"number": 64, "message": "P0 is releasing forks", "states": ["Releasing Forks", "Hungry/Waiting", "Eating", "Thinking"], "forks": [0, 0, 2, 2], "queue": [1], "time": 3.05}, {"number": 65, "message": "P0 released both forks", "states": ["Releasing Forks", "Hungry/Waiting", "Eating", "Thinking"], "forks": [null, null, 2, 2], "queue": [1], "time": 3.05}, {"number": 66, "message": "P0 is thinking", "states": ["Thinking", "Hungry/Waiting", "Eating", "Thinking"], "forks": [null, null, 2, 2], "queue": [1], "time": 3.05}, {"number": 67, "message": "P3 joined the FIFO queue", "states": ["Thinking", "Hungry/Waiting", "Eating", "Hungry/Waiting"], "forks": [null, null, 2, 2], "queue": [1, 3], "time": 3.08}, {"number": 68, "message": "P2 is releasing forks", "states": ["Thinking", "Hungry/Waiting", "Releasing Forks", "Hungry/Waiting"], "forks": [null, null, 2, 2], "queue": [1, 3], "time": 3.58}, {"number": 69, "message": "P2 released both forks", "states": ["Thinking", "Hungry/Waiting", "Releasing Forks", "Hungry/Waiting"], "forks": [null, null, null, null], "queue": [1, 3], "time": 3.58}, {"number": 70, "message": "P2 finished all 3 meals", "states": ["Thinking", "Hungry/Waiting", "Thinking", "Hungry/Waiting"], "forks": [null, null, null, null], "queue": [1, 3], "time": 3.58}, {"number": 71, "message": "P1 is acquiring both forks", "states": ["Thinking", "Acquiring Forks", "Thinking", "Hungry/Waiting"], "forks": [null, null, null, null], "queue": [1, 3], "time": 3.58}, {"number": 72, "message": "P1 acquired F1 and F2", "states": ["Thinking", "Acquiring Forks", "Thinking", "Hungry/Waiting"], "forks": [null, 1, 1, null], "queue": [3], "time": 3.58}, {"number": 73, "message": "P1 started eating meal 3", "states": ["Thinking", "Eating", "Thinking", "Hungry/Waiting"], "forks": [null, 1, 1, null], "queue": [3], "time": 3.58}, {"number": 74, "message": "P0 joined the FIFO queue", "states": ["Hungry/Waiting", "Eating", "Thinking", "Hungry/Waiting"], "forks": [null, 1, 1, null], "queue": [3, 0], "time": 3.63}, {"number": 75, "message": "P3 is acquiring both forks", "states": ["Hungry/Waiting", "Eating", "Thinking", "Acquiring Forks"], "forks": [null, 1, 1, null], "queue": [3, 0], "time": 3.63}, {"number": 76, "message": "P3 acquired F3 and F0", "states": ["Hungry/Waiting", "Eating", "Thinking", "Acquiring Forks"], "forks": [3, 1, 1, 3], "queue": [0], "time": 3.63}, {"number": 77, "message": "P3 started eating meal 3", "states": ["Hungry/Waiting", "Eating", "Thinking", "Eating"], "forks": [3, 1, 1, 3], "queue": [0], "time": 3.63}, {"number": 78, "message": "P1 is releasing forks", "states": ["Hungry/Waiting", "Releasing Forks", "Thinking", "Eating"], "forks": [3, 1, 1, 3], "queue": [0], "time": 3.89}, {"number": 79, "message": "P1 released both forks", "states": ["Hungry/Waiting", "Releasing Forks", "Thinking", "Eating"], "forks": [3, null, null, 3], "queue": [0], "time": 3.89}, {"number": 80, "message": "P1 finished all 3 meals", "states": ["Hungry/Waiting", "Thinking", "Thinking", "Eating"], "forks": [3, null, null, 3], "queue": [0], "time": 3.89}, {"number": 81, "message": "P3 is releasing forks", "states": ["Hungry/Waiting", "Thinking", "Thinking", "Releasing Forks"], "forks": [3, null, null, 3], "queue": [0], "time": 3.96}, {"number": 82, "message": "P3 released both forks", "states": ["Hungry/Waiting", "Thinking", "Thinking", "Releasing Forks"], "forks": [null, null, null, null], "queue": [0], "time": 3.96}, {"number": 83, "message": "P3 finished all 3 meals", "states": ["Hungry/Waiting", "Thinking", "Thinking", "Thinking"], "forks": [null, null, null, null], "queue": [0], "time": 3.96}, {"number": 84, "message": "P0 is acquiring both forks", "states": ["Acquiring Forks", "Thinking", "Thinking", "Thinking"], "forks": [null, null, null, null], "queue": [0], "time": 3.96}, {"number": 85, "message": "P0 acquired F0 and F1", "states": ["Acquiring Forks", "Thinking", "Thinking", "Thinking"], "forks": [0, 0, null, null], "queue": [], "time": 3.96}, {"number": 86, "message": "P0 started eating meal 3", "states": ["Eating", "Thinking", "Thinking", "Thinking"], "forks": [0, 0, null, null], "queue": [], "time": 3.96}, {"number": 87, "message": "P0 is releasing forks", "states": ["Releasing Forks", "Thinking", "Thinking", "Thinking"], "forks": [0, 0, null, null], "queue": [], "time": 4.42}, {"number": 88, "message": "P0 released both forks", "states": ["Releasing Forks", "Thinking", "Thinking", "Thinking"], "forks": [null, null, null, null], "queue": [], "time": 4.42}, {"number": 89, "message": "P0 finished all 3 meals", "states": ["Thinking", "Thinking", "Thinking", "Thinking"], "forks": [null, null, null, null], "queue": [], "time": 4.42}];
+let current = 0;
+let timer = null;
+
+const colors = {
+    "Thinking": "#e8eef7",
+    "Hungry/Waiting": "#fff0b8",
+    "Acquiring Forks": "#dce5ff",
+    "Eating": "#c9f5d9",
+    "Releasing Forks": "#ffdcd5"
+};
+
+function showEvent(index) {
+    current = Math.max(0, Math.min(index, events.length - 1));
+    const e = events[current];
+
+    document.getElementById("timeline").max = events.length - 1;
+    document.getElementById("timeline").value = current;
+    document.getElementById("progress").textContent =
+        "Event " + (current + 1) + " of " + events.length +
+        " | Time: " + e.time + " seconds";
+    document.getElementById("message").textContent = e.message;
+
+    document.getElementById("philosophers").innerHTML =
+        e.states.map((s, p) =>
+            '<div class="philosopher" style="background:' +
+            colors[s] + '">' +
+            '<strong>Philosopher P' + p + '</strong>' +
+            '<div class="state">' + s + '</div>' +
+            '<div>Left fork: F' + p + '</div>' +
+            '<div>Right fork: F' + ((p + 1) % 4) + '</div>' +
+            '</div>'
+        ).join("");
+
+    document.getElementById("forks").innerHTML =
+        e.forks.map((owner, f) =>
+            '<div class="fork ' + (owner === null ? "free" : "busy") +
+            '"><strong>Fork F' + f + '</strong><br>' +
+            (owner === null ? "Available" : "Owned by P" + owner) +
+            '</div>'
+        ).join("");
+
+    document.getElementById("queue").textContent =
+        e.queue.length ? e.queue.map(p => "P" + p).join(" → ")
+                       : "Empty — no philosophers waiting";
+
+    document.getElementById("log").innerHTML =
+        events.slice(0, current + 1).map((item, i) =>
+            '<div class="log-row ' + (i === current ? "active" : "") +
+            '">#' + item.number + ' (' + item.time + 's): ' +
+            escapeText(item.message) + '</div>'
+        ).join("");
+
+    const log = document.getElementById("log");
+    log.scrollTop = log.scrollHeight;
+}
+
+function escapeText(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function previousEvent() { pause(); showEvent(current - 1); }
+function nextEvent() { pause(); showEvent(current + 1); }
+function resetReplay() { pause(); showEvent(0); }
+
+function pause() {
+    if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+    }
+    document.getElementById("play").textContent = "Play";
+}
+
+function togglePlay() {
+    if (timer !== null) {
+        pause();
+        return;
+    }
+
+    if (current >= events.length - 1) showEvent(0);
+
+    document.getElementById("play").textContent = "Pause";
+    timer = setInterval(() => {
+        if (current >= events.length - 1) {
+            pause();
+        } else {
+            showEvent(current + 1);
+        }
+    }, 500);
+}
+
+showEvent(0);
+</script>
+</body>
+</html>
