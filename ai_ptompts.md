@@ -5,7 +5,7 @@
 
 ---
 
-## 10.1 AI Tools Used
+## 1 AI Tools Used
 
 The following AI tools were used as assistance while working on this Operating Systems synchronization assignment:
 
@@ -17,7 +17,7 @@ The following AI tools were used as assistance while working on this Operating S
 
 ---
 
-## 10.2 Initial Prompts Used
+## 2 Initial Prompts Used
 
 The following prompts represent the types of questions used to understand and develop the project:
 
@@ -37,7 +37,7 @@ The following prompts represent the types of questions used to understand and de
 
 ---
 
-## 10.3 Manual Changes and Verification
+## 3 Manual Changes and Verification
 
 The code was reviewed to understand how threads are synchronized, how shared resources are accessed, and how the execution states are recorded. The explanations used in the documentation were compared with the synchronization mechanisms present in the submitted programs.
 
@@ -49,4 +49,3 @@ Both programs record events during execution and use those events to generate HT
 
 The project documentation was prepared to match the two submitted programs. The descriptions of synchronization, resource access, and HTML generation are based on the code rather than on unrelated implementations.
 
-Any additional code modifications, debugging, or testing performed by the student should be described here before submission.
